@@ -23,9 +23,33 @@ from imblearn.over_sampling import SMOTE
 import scipy.stats
 import collections
 from sklearn.decomposition import PCA
+import statsmodels.api as sm
 
 
+def create_model(optimizer='adam'):
+    model2= Sequential()
+    feature_length= len(X)
+    #sgd = keras.optimizers.RMSprop(lr=.001)
+    model2.add(Dense(30, input_dim= 22, kernel_initializer='he_normal',
+                     activation='relu',
+                     kernel_regularizer=l2(0.01)))
+    model2.add(Dense(100,
+                     kernel_regularizer=l2(0.01),
+                     activation='sigmoid'))
+    model2.add(Dense(200,
+                     kernel_initializer='he_normal',
+                     activation='relu',
+                     kernel_regularizer=l2(0.01)))
+    model2.add(Dense(400,
+                     kernel_initializer='he_normal',
+                     activation='relu',
+                     kernel_regularizer=l2(0.01)))
 
+    model2.add(Dense(1,  activation='sigmoid'))
+    model2.compile(loss='binary_crossentropy', optimizer=optimizer,
+                   metrics=['accuracy'])
+
+    return model2
 
 # Commented out IPython magic to ensure Python compatibility.
 # %cd ../bin/kaggle_catgory_feature/
@@ -56,8 +80,8 @@ df= df.drop(['target'], axis=1)
 for i in df.columns:
     cont = pd.crosstab(df[i], y)
     chi= scipy.stats.chi2_contingency(cont)
-    print(chi[1])
-    if chi[1]<1.0:
+    if chi[1]>0.1:
+        print(chi[1])
         df= df.drop(i, axis=1)
 cols= list(df.columns)
 
@@ -92,11 +116,24 @@ for i in subset.columns:
     #subset[i]= subset[i].map(item_list[i])
 
 
+
+
+
 df= df.select_dtypes(np.number)
+for i in df.columns:
+    print(df[i].corr(y))
+
+df.corr()
+
+
+
+
+
+
 
 df= pd.concat([df, subset],sort= False, axis=1)
 X= df
-
+m= sm.OLS(y,X).fit()
 # =============================================================================
 # pca = PCA(n_components=2)
 # principalComponents = pca.fit_transform(X)
@@ -110,7 +147,7 @@ X= df
 X, y = sm.fit_sample(X, y.ravel())
 
 
-scaler= MinMaxScaler()
+#scaler= MinMaxScaler()
 #X= scaler.fit_transform(X)
 
 #x_train,x_test,y_train,y_test= train_test_split(X, y, test_size= .2)
@@ -122,8 +159,8 @@ scaler= MinMaxScaler()
 
 
 
+
 # =============================================================================
-#
 # model= xg_reg = xgb.XGBClassifier(subsample= 1.0,
 #                                  min_child_weight= 10,
 #                                  learning_rate= 0.1,
@@ -142,34 +179,31 @@ scaler= MinMaxScaler()
 
 
 
-
 import keras
 from keras.models import Sequential
 from keras.layers import Dense,Dropout
 from keras.regularizers import l2
-
-model2= Sequential()
-feature_length= len(X)
-sgd = keras.optimizers.Adam(lr=.001)
-model2.add(Dense(30, input_dim= 15, kernel_initializer='he_normal',
-                 activation='relu',
-                 kernel_regularizer=l2(0.01)))
-model2.add(Dense(100,kernel_regularizer=l2(0.01), activation='sigmoid'))
-model2.add(Dense(200,  kernel_initializer='he_normal', activation='relu',
-                 kernel_regularizer=l2(0.01)))
-model2.add(Dense(400,  kernel_initializer='he_normal', activation='relu',
-                 kernel_regularizer=l2(0.01)))
-
-model2.add(Dense(1,  activation='sigmoid'))
-model2.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy'])
-
-model2.fit(X, y, epochs=50, batch_size=10000)
+from sklearn.model_selection import GridSearchCV
+from keras.wrappers.scikit_learn import KerasClassifier
+import keras.optimizers
 
 
+model = KerasClassifier(build_fn=create_model)
+optimizers = ['SGD', 'RMSprop', 'Adagrad', 'Adam', 'Adamax', 'Nadam']
+param_grid= dict(optimizer=optimizers)
+grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1, cv=3)
+grid_result = grid.fit(X, y)
 
 
-
-
+#model2.fit(X, y, epochs=10, batch_size=10000)
+print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+means = grid_result.cv_results_['mean_test_score']
+stds = grid_result.cv_results_['std_test_score']
+params = grid_result.cv_results_['params']
+for mean, stdev, param in zip(means, stds, params):
+    print("%f (%f) with: %r" % (mean, stdev, param))
+model2= create_model('SGD')
+model2.fit(X,y, epochs=10)
 
 
 #Test Data
