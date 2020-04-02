@@ -58,15 +58,17 @@ def create_model(optimizer='adam'):
 
 df= pd.read_csv(r'train.csv')
 
+df= df.sort_values(['bin_0'])
+
+df= df.reset_index(drop='first')
+
 for column in df.columns:
     df[column].fillna(df[column].mode()[0], inplace=True)
 
 sm = SMOTE(random_state = 4)
 
-# =============================================================================
-# for i in df.columns:
-#     print(i, " : ", df[i].value_counts())
-# =============================================================================
+for i in df.columns:
+    print(i, " : ", df[i].value_counts())
 
 
 
@@ -91,23 +93,12 @@ cols= list(df.columns)
 #df= df.fillna(0)
 subset= df.select_dtypes(exclude=[np.number])
 
-
-
-
 # =============================================================================
 # for i in subset.columns:
 #     if len(subset[i].value_counts())>=10:
 #         value_dict= subset[i].value_counts().to_dict()
 #         sorted_dict = {k: v for k, v in sorted(x.items(), key=lambda item: item[1])}
 # =============================================================================
-
-
-
-
-
-
-
-
 encoder= LabelEncoder()
 item_list={}
 for i in subset.columns:
@@ -115,69 +106,42 @@ for i in subset.columns:
     #item_list[i]= subset[i].value_counts().to_dict()
     #subset[i]= subset[i].map(item_list[i])
 
-
-
-
-
 df= df.select_dtypes(np.number)
 for i in df.columns:
     print(df[i].corr(y))
 
 df.corr()
 
-
-
-
-
-
-
 df= pd.concat([df, subset],sort= False, axis=1)
 X= df
 m= sm.OLS(y,X).fit()
-# =============================================================================
-# pca = PCA(n_components=2)
-# principalComponents = pca.fit_transform(X)
-# temp= pd.DataFrame(data= principalComponents)
-# temp['target']= y
-# =============================================================================
+pca = PCA(n_components=2)
+principalComponents = pca.fit_transform(X)
+temp= pd.DataFrame(data= principalComponents)
+temp['target']= y
 
-#sns.pairplot(temp,  hue='target', diag_kind='hist')
-
-
+plot= sns.pairplot(temp,  hue='target', diag_kind='hist')
 X, y = sm.fit_sample(X, y.ravel())
+scaler= MinMaxScaler()
+X= scaler.fit_transform(X)
+x_train,x_test,y_train,y_test= train_test_split(X, y, test_size= .2)
 
 
-#scaler= MinMaxScaler()
-#X= scaler.fit_transform(X)
-
-#x_train,x_test,y_train,y_test= train_test_split(X, y, test_size= .2)
-
-#model= RandomForestClassifier(n_estimators=1000)
+#Random Forest Classifier
+model= RandomForestClassifier(n_estimators=1000)
+model.fit(X, y)
+model.score(x_test, y_test)
 
 
-
-
-
-
-
-# =============================================================================
-# model= xg_reg = xgb.XGBClassifier(subsample= 1.0,
-#                                  min_child_weight= 10,
-#                                  learning_rate= 0.1,
-#                                  gamma= 1.5,
-#                                  booster= 'gbtree',
-#                                  colsample_bytree= 1.0)
-# model.fit(X, y)
-#
-#
-# model.score(x_test, y_test)
-# =============================================================================
-
-
-
-
-
-
+#XGBoost Classifier
+model= xg_reg = xgb.XGBClassifier(subsample= 1.0,
+                                 min_child_weight= 10,
+                                 learning_rate= 0.1,
+                                 gamma= 1.5,
+                                 booster= 'gbtree',
+                                 colsample_bytree= 1.0)
+model.fit(X, y)
+model.score(x_test, y_test)
 
 import keras
 from keras.models import Sequential
